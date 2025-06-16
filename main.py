@@ -1,4 +1,3 @@
-import os
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -26,6 +25,10 @@ def fetch_latest_news():
         news_items.append({"title": title, "link": link})
     return news_items
 
+@app.route("/")
+def index():
+    return "Server is running"
+
 @app.route("/news")
 def news():
     news = fetch_latest_news()
@@ -34,5 +37,4 @@ def news():
     return jsonify(news)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=8080)
