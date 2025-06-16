@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -33,4 +34,5 @@ def news():
     return jsonify(news)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
