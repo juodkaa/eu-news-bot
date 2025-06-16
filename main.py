@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
+import os  # импортируем os для чтения переменных окружения
 
 app = Flask(__name__)
 
@@ -33,4 +34,5 @@ def news():
     return jsonify(news)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    port = int(os.environ.get("PORT", 8080))  # берём порт из окружения, или ставим 8080 по умолчанию
+    app.run(host="0.0.0.0", port=port)
