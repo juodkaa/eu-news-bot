@@ -14,15 +14,13 @@ def fetch_news():
     response = requests.get(SOURCE_URL)
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Ищем все ссылки с классом "news-title"
-    headlines = soup.find_all("a", class_="news-title")
+    headlines = soup.find_all("a", class_="press-release-title")[:5]
 
     if not headlines:
         print(f"[{datetime.now()}] ❌ Не найдено новостей на странице.")
         return
 
-    # Ограничиваем первыми 5 новостями
-    for item in headlines[:5]:
+    for item in headlines:
         title = item.get_text(strip=True)
         link = "https://ec.europa.eu" + item['href']
         print(f"[{datetime.now()}] Найдена новость: {title}")
