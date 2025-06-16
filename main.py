@@ -1,65 +1,48 @@
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime
-from requests.auth import HTTPBasicAuth
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 
-# ==== НАСТРОЙКИ ====
-WORDPRESS_URL = "https://linale.lt/wp-json/wp/v2/posts"
-WORDPRESS_USER = "p3anjn"  # имя пользователя WordPress
-WORDPRESS_APP_PASSWORD = "DeEu QF8K o4tj rULp nFw7 38Te"  # Application Password
+def fetch_latest_news():
+    # Настройки браузера (без головы — без графического окна)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
 
-SOURCE_URL = "https://ec.europa.eu/commission/presscorner/home/en"
+    # Запуск драйвера
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-def fetch_news():
-    response = requests.get(SOURCE_URL)
-    soup = BeautifulSoup(response.text, "html.parser")
+    try:
+        url = "https://ec.europa.eu/commission/presscorner/home/en"
+        driver.get(url)
 
-    latest_section = soup.find(id="latest")
-    if not latest_section:
-        print("Блок Latest не найден.")
-        return
+        # Ждем загрузки страницы и элементов (можно увеличить если сеть медленная)
+        time.sleep(5)
 
-    headlines = latest_section.find_all("a", class_="ec-title")
+        # Ищем блок Latest
+        latest_block = driver.find_element(By.ID, "latest")
 
-    if not headlines:
-        print("Новостей в Latest не найдено.")
-        return
+        # Ищем все новости в блоке
+        news_items = latest_block.find_elements(By.CSS_SELECTOR, "article")
 
-    for item in headlines[:5]:  # берем первые 5 новостей
-        title = item.text.strip()
-        link = item["href"]
-        if not link.startswith("http"):
-            link = "https://ec.europa.eu" + link
+        print(f"Найдено новостей: {len(news_items)}")
 
-        publish_post(title, link)
+        for item in news_items:
+            title_element = item.find_element(By.CSS_SELECTOR, "h2 a")
+            title = title_element.text
+            link = title_element.get_attribute("href")
 
-def publish_post(title, link):
-    post_data = {
-        "title": title,
-        "content": f"<p>Источник: <a href='{link}' target='_blank'>{link}</a></p>",
-        "status": "publish"
-    }
+            print(f"Заголовок: {title}")
+            print(f"Ссылка: {link}")
+            print("---")
 
-    response = requests.post(
-        WORDPRESS_URL,
-        json=post_data,
-        auth=HTTPBasicAuth(WORDPRESS_USER, WORDPRESS_APP_PASSWORD)
-    )
-
-    if response.status_code == 201:
-        print(f"[{datetime.now()}] ✔ Успешно опубликовано: {title}")
-    else:
-        print(f"[{datetime.now()}] ❌ Ошибка: {response.status_code} - {response.text}")
-
-def main():
-    news_list = fetch_news()
-    if not news_list:
-        print(f"[{datetime.now()}] Нет новостей для публикации.")
-        return
-
-    for news in news_list:
-        print(f"[{datetime.now()}] Публикация новости: {news['title']}")
-        publish_post(news["title"], news["link"])
+    except Exception as e:
+        print("Ошибка при получении новостей:", e)
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
-    main()
+    fetch_latest_news()
