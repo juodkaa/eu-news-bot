@@ -1,7 +1,6 @@
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
-import os  # импортируем os для чтения переменных окружения
 
 app = Flask(__name__)
 
@@ -10,14 +9,11 @@ def fetch_latest_news():
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
+    news_items = []
     latest_section = soup.find("section", {"aria-label": "Latest"})
     if not latest_section:
-        print("Блок Latest не найден!")
-        return []
+        return news_items
 
-    print(latest_section.prettify())  # Выводим HTML блока Latest для анализа
-
-    news_items = []
     articles = latest_section.find_all("article")[:5]  # первые 5 новостей
 
     for article in articles:
@@ -37,5 +33,4 @@ def news():
     return jsonify(news)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  # берём порт из окружения, или ставим 8080 по умолчанию
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=8080)
