@@ -11,22 +11,22 @@ WORDPRESS_APP_PASSWORD = "DeEu QF8K o4tj rULp nFw7 38Te"  # Application Password
 SOURCE_URL = "https://ec.europa.eu/commission/presscorner/home/en"
 
 def fetch_news():
-    try:
-        response = requests.get(SOURCE_URL)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        print(f"[{datetime.now()}] Ошибка запроса к источнику: {e}")
-        return []
-
+    response = requests.get(SOURCE_URL)
     soup = BeautifulSoup(response.text, "html.parser")
-    headlines = headlines = soup.find_all("a", class_="news-title")[:5]
 
-    news = []
-    for item in headlines:
-        title = item.text.strip()
-        link = "https://ec.europa.eu" + item.get("href", "")
-        news.append({"title": title, "link": link})
-    return news
+    # Ищем все ссылки с классом "news-title"
+    headlines = soup.find_all("a", class_="news-title")
+
+    if not headlines:
+        print(f"[{datetime.now()}] ❌ Не найдено новостей на странице.")
+        return
+
+    # Ограничиваем первыми 5 новостями
+    for item in headlines[:5]:
+        title = item.get_text(strip=True)
+        link = "https://ec.europa.eu" + item['href']
+        print(f"[{datetime.now()}] Найдена новость: {title}")
+        publish_post(title, link)
 
 def publish_post(title, link):
     post_data = {
