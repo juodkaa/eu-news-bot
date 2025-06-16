@@ -5,19 +5,24 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 def fetch_latest_news():
-    url = "https://www.bbc.com/news"
+    url = "https://ec.europa.eu/commission/presscorner/home/en"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
     news_items = []
-    articles = soup.find_all("h3", class_="gs-c-promo-heading__title")[:5]
+    latest_section = soup.find("section", {"aria-label": "Latest"})
+    if not latest_section:
+        return news_items
+
+    articles = latest_section.find_all("article")[:5]
 
     for article in articles:
-        title = article.get_text(strip=True)
-        link_tag = article.find_parent("a")
-        link = "https://www.bbc.com" + link_tag.get("href") if link_tag else "#"
+        title_tag = article.find("a")
+        if not title_tag:
+            continue
+        title = title_tag.get_text(strip=True)
+        link = "https://ec.europa.eu" + title_tag.get("href")
         news_items.append({"title": title, "link": link})
-
     return news_items
 
 @app.route("/")
@@ -30,9 +35,3 @@ def news():
     if not news:
         return jsonify({"message": "No news available"}), 404
     return jsonify(news)
-
-if __name__ == "__main__":
-    import logging
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)  # Отключаем предупреждения Flask
-    app.run(host="0.0.0.0", port=8080)
