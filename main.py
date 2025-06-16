@@ -10,17 +10,13 @@ def fetch_latest_news():
     soup = BeautifulSoup(response.text, "html.parser")
 
     news_items = []
+    # На основе структуры твоего сайта выбираем блок с новостями
+    articles = soup.select("div#content div.entry-title a")[:5]  # первые 5 новостей
 
-    # На основе структуры сайта выбираем, где заголовки новостей
-    articles = soup.select(".news-article__title")  # пример селектора для заголовков
-
-    for article in articles[:5]:  # возьмем первые 5 новостей
-        title = article.get_text(strip=True)
-        link = article.find("a")["href"] if article.find("a") else None
-        if link and not link.startswith("http"):
-            link = url.rstrip("/") + "/" + link.lstrip("/")
+    for a in articles:
+        title = a.get_text(strip=True)
+        link = a.get("href")
         news_items.append({"title": title, "link": link})
-
     return news_items
 
 @app.route("/")
@@ -34,4 +30,5 @@ def news():
         return jsonify({"message": "No news available"}), 404
     return jsonify(news)
 
-# gunicorn будет запускать сервер, так что app.run() не нужен
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
