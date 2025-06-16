@@ -1,49 +1,43 @@
-from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
+from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-@app.route("/")
+URL = 'https://europospulsas.lt/naujienos-ir-straipsniai/'
+
+@app.route('/')
 def index():
     return "Server is running"
 
-@app.route("/news")
+@app.route('/news')
 def news():
-    url = "https://europospulsas.lt/"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
-                      " Chrome/90.0.4430.212 Safari/537.36"
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        return jsonify({"error": str(e)}), 500
+    resp = requests.get(URL)
+    if resp.status_code != 200:
+        return jsonify({'message': 'Failed to fetch news'}), 500
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    news_section = soup.find("div", class_="news-list")  # Подставьте правильный класс/тег для новостей
-    if not news_section:
-        return jsonify({"message": "No news available"})
-
-    news_items = news_section.find_all("article", limit=5)  # Или другой тег, который у вас используется для новостей
-    if not news_items:
-        return jsonify({"message": "No news available"})
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    articles = soup.find_all('article', class_='elementor-post')
 
     news_list = []
-    for item in news_items:
-        title_tag = item.find("h2")  # Или нужный тег для заголовка новости
-        link_tag = item.find("a")
-        if title_tag and link_tag and link_tag.get("href"):
-            news_list.append({
-                "title": title_tag.get_text(strip=True),
-                "link": link_tag["href"]
-            })
+    for article in articles:
+        if 'category-nacionaliniai-projektai' not in article.get('class', []):
+            continue
+
+        title_tag = article.find('h3', class_='elementor-post__title')
+        link_tag = title_tag.find('a') if title_tag else None
+        date_tag = article.find('time', class_='elementor-post__meta-date')
+
+        title = title_tag.text.strip() if title_tag else 'No title'
+        link = link_tag['href'] if link_tag else '#'
+        date = date_tag.text.strip() if date_tag else ''
+
+        news_list.append({'title': title, 'link': link, 'date': date})
 
     if not news_list:
-        return jsonify({"message": "No news available"})
+        return jsonify({'message': 'No news available'})
 
     return jsonify(news_list)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host='0.0.0.0', port=8080)
