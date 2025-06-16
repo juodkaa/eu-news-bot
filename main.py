@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask
 import requests
 from bs4 import BeautifulSoup
 
@@ -27,14 +27,14 @@ def fetch_latest_news():
 
 @app.route("/")
 def index():
-    return "Server is running"
-
-@app.route("/news")
-def news():
     news = fetch_latest_news()
     if not news:
-        return jsonify({"message": "Нет новостей"}), 404
-    return jsonify(news)
+        return "<p>Нет новостей</p>"
+    html = "<h1>Новости с пресс-центра ЕС</h1><ul>"
+    for item in news:
+        html += f'<li><a href="{item["link"]}" target="_blank">{item["title"]}</a></li>'
+    html += "</ul>"
+    return html
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
