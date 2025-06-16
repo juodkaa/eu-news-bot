@@ -10,11 +10,7 @@ def fetch_latest_news():
     soup = BeautifulSoup(response.text, "html.parser")
 
     news_items = []
-    latest_section = soup.find("section", {"aria-label": "Latest"})
-    if not latest_section:
-        return news_items
-
-    articles = latest_section.find_all("article")[:5]  # первые 5 новостей
+    articles = soup.find_all("article")[:5]
 
     for article in articles:
         title_tag = article.find("a")
