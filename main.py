@@ -4,7 +4,7 @@ from datetime import datetime
 from requests.auth import HTTPBasicAuth
 
 # ==== НАСТРОЙКИ ====
-WORDPRESS_URL = "https://linale.lt/wp-json/wp/v2/posts"
+WORDPRESS_URL = "https://www.linale.lt/wp-json/wp/v2/posts"
 WORDPRESS_USER = "p3anjn"  # имя пользователя WordPress
 WORDPRESS_APP_PASSWORD = "DeEu QF8K o4tj rULp nFw7 38Te"  # вставь сюда application password
 
