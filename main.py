@@ -4,31 +4,34 @@ from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-def fetch_latest_news():
-    url = "https://europospulsas.lt/"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    news_items = []
-    # На основе структуры твоего сайта выбираем блок с новостями
-    articles = soup.select("div#content div.entry-title a")[:5]  # первые 5 новостей
-
-    for a in articles:
-        title = a.get_text(strip=True)
-        link = a.get("href")
-        news_items.append({"title": title, "link": link})
-    return news_items
-
-@app.route("/")
+@app.route('/')
 def index():
     return "Server is running"
 
-@app.route("/news")
+@app.route('/news')
 def news():
-    news = fetch_latest_news()
-    if not news:
-        return jsonify({"message": "No news available"}), 404
-    return jsonify(news)
+    url = "https://europospulsas.lt/"
+    response = requests.get(url)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    news_list = []
+
+    # Блок Recent News в правой колонке
+    recent_news_section = soup.find('aside', class_='widget_recent_entries')
+    if recent_news_section:
+        items = recent_news_section.find_all('li')
+        for item in items:
+            a_tag = item.find('a')
+            if a_tag:
+                title = a_tag.get_text(strip=True)
+                link = a_tag['href']
+                news_list.append({'title': title, 'link': link})
+
+    if not news_list:
+        return jsonify({"message": "No news available"})
+
+    return jsonify(news_list)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
