@@ -19,7 +19,7 @@ def fetch_news():
         return []
 
     soup = BeautifulSoup(response.text, "html.parser")
-    headlines = soup.find_all("a", class_="press-release-title")[:5]
+    headlines = headlines = soup.find_all("a", class_="news-title")[:5]
 
     news = []
     for item in headlines:
