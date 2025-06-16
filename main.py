@@ -1,11 +1,15 @@
+from flask import Flask
 import requests
 from bs4 import BeautifulSoup
 from requests.auth import HTTPBasicAuth
+import os
 
 # Настройки WordPress
 WP_URL = "https://linale.lt/wp-json/wp/v2/posts"
-WP_USER = "p3anjn"  # например "admin"
-WP_APP_PASSWORD = "DeEu QF8K o4tj rULp nFw7 38Te"
+WP_USER = "p3anjn"  # Замените
+WP_APP_PASSWORD = "DeEu QF8K o4tj rULp nFw7 38Te"  # Замените
+
+app = Flask(__name__)
 
 def fetch_news():
     url = "https://ec.europa.eu/commission/presscorner/home/en"
@@ -17,7 +21,6 @@ def fetch_news():
         title = item.text.strip()
         link = "https://ec.europa.eu" + item["href"]
 
-        # Проверка: не публиковалось ли уже
         if not post_exists(title):
             publish_to_wordpress(title, link)
 
@@ -29,15 +32,16 @@ def post_exists(title):
 def publish_to_wordpress(title, link):
     post = {
         "title": title,
-        "content": f"<p>Оригинал: <a href='{link}'>{link}</a></p>",
+        "content": f"<p><a href='{link}'>{link}</a></p>",
         "status": "publish"
     }
     response = requests.post(WP_URL, auth=HTTPBasicAuth(WP_USER, WP_APP_PASSWORD), json=post)
+    print(f"Posted: {title}, status: {response.status_code}")
 
-    if response.status_code == 201:
-        print(f"✅ Опубликовано: {title}")
-    else:
-        print(f"❌ Ошибка публикации: {response.status_code} — {response.text}")
-
-if __name__ == "__main__":
+@app.route('/')
+def run_parser():
     fetch_news()
+    return 'Done.'
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
