@@ -14,6 +14,14 @@ def fetch_news():
     response = requests.get(SOURCE_URL)
     soup = BeautifulSoup(response.text, "html.parser")
 
+    # Выведем все ссылки с классами, которые содержат 'press-release'
+    links = soup.find_all("a")
+    for link in links:
+        classes = link.get("class", [])
+        if any("press-release" in c for c in classes):
+            print(f"Найден элемент с классом {classes}: текст = {link.get_text(strip=True)}")
+
+    # Попытка найти новости (текущий селектор)
     headlines = soup.find_all("a", class_="press-release-title")[:5]
 
     if not headlines:
