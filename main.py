@@ -8,21 +8,21 @@ PRESS_CORNER_URL = "https://ec.europa.eu/commission/presscorner/home/en"
 
 def fetch_press_news():
     try:
-        response = requests.get(PRESS_CORNER_URL)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+        }
+        response = requests.get(PRESS_CORNER_URL, headers=headers)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'html.parser')
         news_list = []
 
-        # В пресс-центре новости в блоках с классом 'ec-press-release' (пример)
-        # Нужно уточнить точный селектор под структуру сайта
+        # На странице новости обернуты в div с классом 'views-row'
+        articles = soup.select('div.views-row')
 
-        # Пример селектора для пресс-релизов:
-        articles = soup.select('div.ec-press-release')
-
-        for article in articles[:10]:  # берем максимум 10 новостей
+        for article in articles[:10]:
             title_tag = article.select_one('h3 a')
-            date_tag = article.select_one('time')
+            date_tag = article.select_one('span.date-display-single')
             link = title_tag['href'] if title_tag else None
             title = title_tag.get_text(strip=True) if title_tag else "No title"
             date = date_tag.get_text(strip=True) if date_tag else "No date"
