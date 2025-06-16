@@ -5,12 +5,16 @@ url = "https://ec.europa.eu/commission/presscorner/home/en"
 response = requests.get(url)
 soup = BeautifulSoup(response.text, "html.parser")
 
-# Выведем все ссылки с классом press-release-title
-headlines = soup.find_all("a", class_="press-release-title")
+# Ищем все ссылки внутри <h3> (судя по структуре сайта)
+headlines = soup.select("h3 a")
 
 print(f"Найдено новостей: {len(headlines)}")
 
 for item in headlines[:5]:
-    print("Заголовок:", item.text.strip())
-    print("Ссылка:", "https://ec.europa.eu" + item['href'])
+    title = item.text.strip()
+    link = item['href']
+    if not link.startswith("http"):
+        link = "https://ec.europa.eu" + link
+    print("Заголовок:", title)
+    print("Ссылка:", link)
     print()
