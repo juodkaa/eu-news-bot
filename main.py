@@ -1,56 +1,57 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template_string
 import requests
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-PRESS_CORNER_URL = "https://ec.europa.eu/commission/presscorner/home/en"
+URL = 'https://ec.europa.eu/commission/presscorner/home/en/'
 
-def fetch_press_news():
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-        }
-        response = requests.get(PRESS_CORNER_URL, headers=headers)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        news_list = []
-
-        # На странице новости обернуты в div с классом 'views-row'
-        articles = soup.select('div.views-row')
-
-        for article in articles[:10]:
-            title_tag = article.select_one('h3 a')
-            date_tag = article.select_one('span.date-display-single')
-            link = title_tag['href'] if title_tag else None
-            title = title_tag.get_text(strip=True) if title_tag else "No title"
-            date = date_tag.get_text(strip=True) if date_tag else "No date"
-            if link and not link.startswith("http"):
-                link = "https://ec.europa.eu" + link
-
-            news_list.append({
-                "title": title,
-                "date": date,
-                "link": link
-            })
-
-        if not news_list:
-            return {"message": "No news available"}
-
-        return news_list
-
-    except Exception as e:
-        return {"message": f"Error fetching news: {str(e)}"}
-
-@app.route("/news")
-def news():
-    news_data = fetch_press_news()
-    return jsonify(news_data)
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
+                  ' Chrome/114.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Referer': 'https://google.com/',
+    'Connection': 'keep-alive'
+}
 
 @app.route("/")
 def index():
-    return "Press center news API is running"
+    return "Server is running"
+
+@app.route("/news")
+def news():
+    try:
+        resp = requests.get(URL, headers=headers, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        return jsonify({"message": "Failed to fetch news", "error": str(e)}), 500
+
+    soup = BeautifulSoup(resp.text, 'html.parser')
+
+    articles = soup.find_all('article', class_='elementor-post')
+
+    news_list = []
+    for article in articles:
+        title_tag = article.find('h3', class_='elementor-post__title')
+        link_tag = article.find('a', class_='elementor-post__read-more')
+        date_tag = article.find('time')
+
+        title = title_tag.text.strip() if title_tag else 'No title'
+        link = link_tag['href'] if link_tag and link_tag.has_attr('href') else None
+        date = date_tag.text.strip() if date_tag else 'No date'
+
+        news_list.append({
+            "title": title,
+            "link": link,
+            "date": date
+        })
+
+    if not news_list:
+        return jsonify({"message": "No news available"})
+
+    # Возвращаем JSON
+    return jsonify(news_list)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
