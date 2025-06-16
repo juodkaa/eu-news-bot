@@ -5,24 +5,22 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 def fetch_latest_news():
-    url = "https://ec.europa.eu/commission/presscorner/home/en"
+    url = "https://europospulsas.lt/"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
     news_items = []
-    latest_section = soup.find("section", {"aria-label": "Latest"})
-    if not latest_section:
-        return news_items
 
-    articles = latest_section.find_all("article")[:5]
+    # На основе структуры сайта выбираем, где заголовки новостей
+    articles = soup.select(".news-article__title")  # пример селектора для заголовков
 
-    for article in articles:
-        title_tag = article.find("a")
-        if not title_tag:
-            continue
-        title = title_tag.get_text(strip=True)
-        link = "https://ec.europa.eu" + title_tag.get("href")
+    for article in articles[:5]:  # возьмем первые 5 новостей
+        title = article.get_text(strip=True)
+        link = article.find("a")["href"] if article.find("a") else None
+        if link and not link.startswith("http"):
+            link = url.rstrip("/") + "/" + link.lstrip("/")
         news_items.append({"title": title, "link": link})
+
     return news_items
 
 @app.route("/")
@@ -35,3 +33,5 @@ def news():
     if not news:
         return jsonify({"message": "No news available"}), 404
     return jsonify(news)
+
+# gunicorn будет запускать сервер, так что app.run() не нужен
