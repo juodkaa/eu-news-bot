@@ -1,8 +1,7 @@
 import httpx
 import json
 from bs4 import BeautifulSoup, NavigableString, Tag
-import requests
-from requests.auth import HTTPBasicAuth
+import base64
 
 # 1. Получаем последние новости
 def get_latest_news():
@@ -94,42 +93,38 @@ def get_document_details(refcode):
 
     return title, clean_content
 
-# 5. Публикация на WordPress
-def post_to_wordpress(title, content):
-    url = "https://linale.lt/wp-json/wp/v2/posts"
-    user = "p3anjn"
-    app_password = "DeEu QF8K o4tj rULp nFw7 38Te"
-
+# 5. Публикация новости в WordPress
+def publish_post_to_wp(title, content, username, application_password):
+    wp_url = "https://linale.lt/wp-json/wp/v2/posts"
+    
+    credentials = f"{username}:{application_password}"
+    token = base64.b64encode(credentials.encode())
     headers = {
+        "Authorization": f"Basic {token.decode('utf-8')}",
         "Content-Type": "application/json"
     }
 
-    post = {
+    post_data = {
         "title": title,
         "content": content,
         "status": "publish"
     }
 
-    response = requests.post(url, json=post, headers=headers,
-                             auth=HTTPBasicAuth(user, app_password))
-
+    response = httpx.post(wp_url, headers=headers, json=post_data)
     if response.status_code == 201:
-        print(f"Публикация успешна: {title}")
+        print(f"Новость '{title}' опубликована успешно.")
     else:
-        print(f"Ошибка публикации: {response.status_code} - {response.text}")
+        print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
 
 # Основной запуск
 def main():
-    # Получаем свежие новости и сохраняем JSON
     news_data = get_latest_news()
     with open("latest_news.json", "w", encoding="utf-8") as f:
         json.dump(news_data, f, ensure_ascii=False, indent=2)
     print("Данные сохранены в latest_news.json")
 
-    # Сохраняем refCode в файл и получаем список
     refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
 
-    # Получаем и сохраняем каждую новость по refCode и публикуем на сайт
     for ref_code in refcodes:
         print(f"Fetching news {ref_code}...")
         try:
@@ -138,14 +133,10 @@ def main():
             print(f"Ошибка при загрузке новости {ref_code}: {e}")
             continue
 
-        filename = ref_code.replace("/", "_") + ".txt"
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(f"{title}\n\n{content}")
+        # Публикуем в WordPress
+        publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
 
-        # Публикуем на WordPress
-        post_to_wordpress(title, content)
-
-    print("Finished fetching and posting all news.")
+    print("Finished fetching all news.")
 
 if __name__ == "__main__":
     main()
