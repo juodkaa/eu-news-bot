@@ -140,12 +140,6 @@ def save_published(refcode):
 
 # Основной запуск
 def main():
-    if not is_time_to_run():
-        print("Сейчас не время для запуска, завершаем работу.")
-        return
-
-    published = load_published()
-
     news_data = get_latest_news()
     with open("latest_news.json", "w", encoding="utf-8") as f:
         json.dump(news_data, f, ensure_ascii=False, indent=2)
@@ -154,10 +148,6 @@ def main():
     refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
 
     for ref_code in refcodes:
-        if ref_code in published:
-            print(f"Новость {ref_code} уже опубликована, пропускаем.")
-            continue
-
         print(f"Fetching news {ref_code}...")
         try:
             title, content = get_document_details(ref_code)
@@ -166,7 +156,6 @@ def main():
             continue
 
         publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
-        save_published(ref_code)
 
     print("Finished fetching all news.")
 
