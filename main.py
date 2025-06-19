@@ -1,7 +1,9 @@
-import httpx
+import datetime
+import pytz
 import json
-from bs4 import BeautifulSoup, NavigableString, Tag
 import base64
+import httpx
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 # 1. Получаем последние новости
 def get_latest_news():
@@ -116,8 +118,34 @@ def publish_post_to_wp(title, content, username, application_password):
     else:
         print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
 
+# Проверка времени запуска: с 8 утра до 8 вечера по CET, каждые два часа
+def is_time_to_run():
+    tz = pytz.timezone('Europe/Berlin')
+    now = datetime.datetime.now(tz)
+    hour = now.hour
+    return 8 <= hour <= 20 and (hour % 2 == 0)
+
+# Загружаем список уже опубликованных refCode из файла
+def load_published():
+    try:
+        with open("published.txt", "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f if line.strip())
+    except FileNotFoundError:
+        return set()
+
+# Сохраняем новый опубликованный refCode в файл
+def save_published(refcode):
+    with open("published.txt", "a", encoding="utf-8") as f:
+        f.write(refcode + "\n")
+
 # Основной запуск
 def main():
+    if not is_time_to_run():
+        print("Сейчас не время для запуска, завершаем работу.")
+        return
+
+    published = load_published()
+
     news_data = get_latest_news()
     with open("latest_news.json", "w", encoding="utf-8") as f:
         json.dump(news_data, f, ensure_ascii=False, indent=2)
@@ -126,6 +154,10 @@ def main():
     refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
 
     for ref_code in refcodes:
+        if ref_code in published:
+            print(f"Новость {ref_code} уже опубликована, пропускаем.")
+            continue
+
         print(f"Fetching news {ref_code}...")
         try:
             title, content = get_document_details(ref_code)
@@ -133,8 +165,8 @@ def main():
             print(f"Ошибка при загрузке новости {ref_code}: {e}")
             continue
 
-        # Публикуем в WordPress
         publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
+        save_published(ref_code)
 
     print("Finished fetching all news.")
 
