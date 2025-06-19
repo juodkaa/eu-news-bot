@@ -4,7 +4,8 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 import base64
 import os
 
-# 1. Получаем последние новости
+REFCODES_FILE = "refcodes.txt"
+
 def get_latest_news():
     url = "https://ec.europa.eu/commission/presscorner/api/latestnews?language=en&pagesize=30&pagenumber=1"
     headers = {
@@ -12,31 +13,26 @@ def get_latest_news():
         "Accept": "application/json",
         "Referer": "https://ec.europa.eu/commission/presscorner/home/en"
     }
-
     with httpx.Client(headers=headers) as client:
         response = client.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         return data
 
-# 2. Сохраняем refCode в файл
-def save_refcodes_to_file(json_data, output_path):
-    news_list = json_data.get('docuLanguageListResources', [])
-    refcodes = [item.get('refCode', '') for item in news_list if item.get('refCode')]
+def load_refcodes():
+    if os.path.exists(REFCODES_FILE):
+        with open(REFCODES_FILE, "r", encoding="utf-8") as f:
+            refcodes = set(line.strip() for line in f if line.strip())
+        print(f"Loaded {len(refcodes)} refCodes from file.")
+        return refcodes
+    return set()
 
-    print(f"Refcodes to save ({len(refcodes)}): {refcodes}")
+def save_refcodes(refcodes):
+    with open(REFCODES_FILE, "w", encoding="utf-8") as f:
+        for ref in sorted(refcodes):
+            f.write(ref + "\n")
+    print(f"Saved {len(refcodes)} refCodes to file.")
 
-    abs_path = os.path.abspath(output_path)
-    print("Saving refcodes to:", abs_path)
-
-    with open(output_path, 'w', encoding='utf-8') as f_out:
-        for refcode in refcodes:
-            f_out.write(refcode + '\n')
-
-    print(f"Сохранено {len(refcodes)} refCode в файл {output_path}")
-    return refcodes
-
-# 3. Чистим HTML содержимое новости
 def clean_html(html_content, title=None):
     soup = BeautifulSoup(html_content, "html.parser")
 
@@ -76,7 +72,6 @@ def clean_html(html_content, title=None):
 
     return text
 
-# 4. Получаем детали новости по refCode
 def get_document_details(refcode):
     url = f"https://ec.europa.eu/commission/presscorner/api/documents?reference={refcode}&language=en"
     headers = {
@@ -99,7 +94,6 @@ def get_document_details(refcode):
 
     return title, clean_content
 
-# 5. Публикация новости в WordPress
 def publish_post_to_wp(title, content, username, application_password):
     wp_url = "https://linale.lt/wp-json/wp/v2/posts"
     
@@ -119,34 +113,37 @@ def publish_post_to_wp(title, content, username, application_password):
     response = httpx.post(wp_url, headers=headers, json=post_data)
     if response.status_code == 201:
         print(f"Новость '{title}' опубликована успешно.")
+        return True
     else:
         print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
+        return False
 
-# Основной запуск
 def main():
-    print("Working directory:", os.getcwd())
+    refcodes_published = load_refcodes()
 
     news_data = get_latest_news()
-    print("Keys in news_data:", list(news_data.keys()))
+    news_list = news_data.get('docuLanguageListResources', [])
 
-    with open("latest_news.json", "w", encoding="utf-8") as f:
-        json.dump(news_data, f, ensure_ascii=False, indent=2)
-    print("Данные сохранены в latest_news.json")
+    new_refcodes = [item['refCode'] for item in news_list if item.get('refCode') and item['refCode'] not in refcodes_published]
 
-    refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
+    if not new_refcodes:
+        print("Нет новых новостей для публикации.")
+        return
 
-    for ref_code in refcodes:
-        print(f"Fetching news {ref_code}...")
+    for ref_code in new_refcodes:
+        print(f"Обрабатываем новость {ref_code}...")
         try:
             title, content = get_document_details(ref_code)
         except Exception as e:
             print(f"Ошибка при загрузке новости {ref_code}: {e}")
             continue
 
-        # Публикуем в WordPress
-        publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
+        success = publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
+        if success:
+            refcodes_published.add(ref_code)
 
-    print("Finished fetching all news.")
+    save_refcodes(refcodes_published)
+    print("Обработка новостей завершена.")
 
 if __name__ == "__main__":
     main()
