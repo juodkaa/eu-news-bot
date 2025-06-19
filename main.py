@@ -1,7 +1,8 @@
 import httpx
 import json
-from bs4 import BeautifulSoup, NavigableString, Tag
 import base64
+import re
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 # 1. Получаем последние новости
 def get_latest_news():
@@ -93,28 +94,10 @@ def get_document_details(refcode):
 
     return title, clean_content
 
-# 5. Получаем список заголовков уже опубликованных постов на WP
-def get_published_titles(username, application_password):
-    wp_url = "https://linale.lt/wp-json/wp/v2/posts?per_page=100"
-    credentials = f"{username}:{application_password}"
-    token = base64.b64encode(credentials.encode())
-    headers = {
-        "Authorization": f"Basic {token.decode('utf-8')}"
-    }
-
-    response = httpx.get(wp_url, headers=headers)
-    if response.status_code == 200:
-        posts = response.json()
-        titles = [post['title']['rendered'] for post in posts]
-        return titles
-    else:
-        print(f"Ошибка при получении списка публикаций: {response.status_code}")
-        return []
-
-# 6. Публикация новости в WordPress
+# 5. Публикация новости в WordPress
 def publish_post_to_wp(title, content, username, application_password):
     wp_url = "https://linale.lt/wp-json/wp/v2/posts"
-    
+
     credentials = f"{username}:{application_password}"
     token = base64.b64encode(credentials.encode())
     headers = {
@@ -133,6 +116,30 @@ def publish_post_to_wp(title, content, username, application_password):
         print(f"Новость '{title}' опубликована успешно.")
     else:
         print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
+
+# Дополнительно: нормализация заголовка для сравнения
+def normalize_title(title):
+    text = BeautifulSoup(title, "html.parser").get_text()
+    text = re.sub(r'\s+', ' ', text).strip().lower()
+    return text
+
+# Получаем список уже опубликованных заголовков из WordPress
+def get_published_titles(username, application_password):
+    wp_url = "https://linale.lt/wp-json/wp/v2/posts?per_page=100"
+    credentials = f"{username}:{application_password}"
+    token = base64.b64encode(credentials.encode())
+    headers = {
+        "Authorization": f"Basic {token.decode('utf-8')}"
+    }
+
+    response = httpx.get(wp_url, headers=headers)
+    if response.status_code == 200:
+        posts = response.json()
+        titles = [normalize_title(post['title']['rendered']) for post in posts]
+        return set(titles)
+    else:
+        print(f"Ошибка при получении списка публикаций: {response.status_code}")
+        return set()
 
 # Основной запуск
 def main():
@@ -153,7 +160,8 @@ def main():
             print(f"Ошибка при загрузке новости {ref_code}: {e}")
             continue
 
-        if title in published_titles:
+        normalized_title = normalize_title(title)
+        if normalized_title in published_titles:
             print(f"Новость '{title}' уже опубликована, пропускаем.")
             continue
 
