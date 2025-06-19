@@ -3,8 +3,6 @@ import json
 from bs4 import BeautifulSoup, NavigableString, Tag
 import base64
 import os
-from datetime import datetime, time
-import pytz
 
 # 1. Получаем последние новости
 def get_latest_news():
@@ -25,6 +23,8 @@ def get_latest_news():
 def save_refcodes_to_file(json_data, output_path):
     news_list = json_data.get('docuLanguageListResources', [])
     refcodes = [item.get('refCode', '') for item in news_list if item.get('refCode')]
+
+    print(f"Refcodes to save ({len(refcodes)}): {refcodes}")
 
     abs_path = os.path.abspath(output_path)
     print("Saving refcodes to:", abs_path)
@@ -122,40 +122,20 @@ def publish_post_to_wp(title, content, username, application_password):
     else:
         print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
 
-# 6. Проверка времени для запуска (8:00 - 20:00 CET)
-def is_within_work_hours():
-    cet = pytz.timezone('Europe/Brussels')  # Среднеевропейское время CET/CEST
-    now = datetime.now(tz=cet).time()
-    start = time(8, 0)
-    end = time(20, 0)
-    return start <= now <= end
-
-# 7. Основной запуск
+# Основной запуск
 def main():
-    if not is_within_work_hours():
-        print("Время вне рабочих часов. Скрипт не запускается.")
-        return
+    print("Working directory:", os.getcwd())
 
     news_data = get_latest_news()
+    print("Keys in news_data:", list(news_data.keys()))
+
     with open("latest_news.json", "w", encoding="utf-8") as f:
         json.dump(news_data, f, ensure_ascii=False, indent=2)
     print("Данные сохранены в latest_news.json")
 
-    # Читаем уже опубликованные refCode из файла, если есть
-    published_refcodes = set()
-    if os.path.exists("published_refcodes.txt"):
-        with open("published_refcodes.txt", "r", encoding="utf-8") as f:
-            published_refcodes = set(line.strip() for line in f.readlines())
-    print(f"Загружено {len(published_refcodes)} уже опубликованных refCode")
-
-    # Получаем новые refCode
     refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
 
-    new_refcodes = [rc for rc in refcodes if rc not in published_refcodes]
-
-    print(f"Новых новостей для публикации: {len(new_refcodes)}")
-
-    for ref_code in new_refcodes:
+    for ref_code in refcodes:
         print(f"Fetching news {ref_code}...")
         try:
             title, content = get_document_details(ref_code)
@@ -165,14 +145,6 @@ def main():
 
         # Публикуем в WordPress
         publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
-
-        # Добавляем в список опубликованных
-        published_refcodes.add(ref_code)
-
-    # Обновляем файл опубликованных refCode
-    with open("published_refcodes.txt", "w", encoding="utf-8") as f:
-        for rc in published_refcodes:
-            f.write(rc + "\n")
 
     print("Finished fetching all news.")
 
