@@ -127,7 +127,7 @@ def main():
 
     save_published_refcodes(published_refcodes, published_refcodes_path)
     print("Обработка новостей завершена.")
-sys.exit(0)  # Завершаем процесс, чтобы не перезапускался автоматически
 
 if __name__ == "__main__":
     main()
+    sys.exit(0)  # Завершаем процесс, чтобы не перезапускался автоматически
