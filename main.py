@@ -1,8 +1,8 @@
 import httpx
 import json
-import base64
-import re
 from bs4 import BeautifulSoup, NavigableString, Tag
+import base64
+import os
 
 # 1. Получаем последние новости
 def get_latest_news():
@@ -19,19 +19,7 @@ def get_latest_news():
         data = response.json()
         return data
 
-# 2. Сохраняем refCode в файл
-def save_refcodes_to_file(json_data, output_path):
-    news_list = json_data.get('docuLanguageListResources', [])
-    refcodes = [item.get('refCode', '') for item in news_list if item.get('refCode')]
-
-    with open(output_path, 'w', encoding='utf-8') as f_out:
-        for refcode in refcodes:
-            f_out.write(refcode + '\n')
-
-    print(f"Сохранено {len(refcodes)} refCode в файл {output_path}")
-    return refcodes
-
-# 3. Чистим HTML содержимое новости
+# 2. Чистим HTML содержимое новости
 def clean_html(html_content, title=None):
     soup = BeautifulSoup(html_content, "html.parser")
 
@@ -71,7 +59,7 @@ def clean_html(html_content, title=None):
 
     return text
 
-# 4. Получаем детали новости по refCode
+# 3. Получаем детали новости по refCode
 def get_document_details(refcode):
     url = f"https://ec.europa.eu/commission/presscorner/api/documents?reference={refcode}&language=en"
     headers = {
@@ -94,7 +82,7 @@ def get_document_details(refcode):
 
     return title, clean_content
 
-# 5. Публикация новости в WordPress
+# 4. Публикация новости в WordPress
 def publish_post_to_wp(title, content, username, application_password):
     wp_url = "https://linale.lt/wp-json/wp/v2/posts"
 
@@ -114,60 +102,55 @@ def publish_post_to_wp(title, content, username, application_password):
     response = httpx.post(wp_url, headers=headers, json=post_data)
     if response.status_code == 201:
         print(f"Новость '{title}' опубликована успешно.")
+        return True
     else:
         print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
+        return False
 
-# Дополнительно: нормализация заголовка для сравнения
-def normalize_title(title):
-    text = BeautifulSoup(title, "html.parser").get_text()
-    text = re.sub(r'\s+', ' ', text).strip().lower()
-    return text
-
-# Получаем список уже опубликованных заголовков из WordPress
-def get_published_titles(username, application_password):
-    wp_url = "https://linale.lt/wp-json/wp/v2/posts?per_page=100"
-    credentials = f"{username}:{application_password}"
-    token = base64.b64encode(credentials.encode())
-    headers = {
-        "Authorization": f"Basic {token.decode('utf-8')}"
-    }
-
-    response = httpx.get(wp_url, headers=headers)
-    if response.status_code == 200:
-        posts = response.json()
-        titles = [normalize_title(post['title']['rendered']) for post in posts]
-        return set(titles)
-    else:
-        print(f"Ошибка при получении списка публикаций: {response.status_code}")
+# 5. Читаем опубликованные refCode
+def read_published_refcodes(path):
+    if not os.path.exists(path):
         return set()
+    with open(path, 'r', encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    return set(lines)
+
+# 6. Сохраняем опубликованные refCode
+def save_published_refcodes(path, refcodes_set):
+    with open(path, 'w', encoding='utf-8') as f:
+        for ref in sorted(refcodes_set):
+            f.write(ref + '\n')
 
 # Основной запуск
 def main():
+    published_file = "published_refcodes.txt"
+    published_refcodes = read_published_refcodes(published_file)
+
     news_data = get_latest_news()
-    with open("latest_news.json", "w", encoding="utf-8") as f:
-        json.dump(news_data, f, ensure_ascii=False, indent=2)
-    print("Данные сохранены в latest_news.json")
+    news_list = news_data.get('docuLanguageListResources', [])
 
-    refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
+    new_refcodes = []
+    for item in news_list:
+        ref = item.get('refCode')
+        if ref and ref not in published_refcodes:
+            new_refcodes.append(ref)
 
-    published_titles = get_published_titles("p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
+    print(f"Новых новостей для публикации: {len(new_refcodes)}")
 
-    for ref_code in refcodes:
-        print(f"Fetching news {ref_code}...")
+    for ref_code in new_refcodes:
+        print(f"Загружаем новость {ref_code}...")
         try:
             title, content = get_document_details(ref_code)
         except Exception as e:
             print(f"Ошибка при загрузке новости {ref_code}: {e}")
             continue
 
-        normalized_title = normalize_title(title)
-        if normalized_title in published_titles:
-            print(f"Новость '{title}' уже опубликована, пропускаем.")
-            continue
+        success = publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
+        if success:
+            published_refcodes.add(ref_code)
 
-        publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
-
-    print("Finished fetching all news.")
+    save_published_refcodes(published_file, published_refcodes)
+    print("Готово!")
 
 if __name__ == "__main__":
     main()
