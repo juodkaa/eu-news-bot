@@ -1,9 +1,7 @@
-import datetime
-import pytz
-import json
-import base64
 import httpx
+import json
 from bs4 import BeautifulSoup, NavigableString, Tag
+import base64
 
 # 1. Получаем последние новости
 def get_latest_news():
@@ -95,7 +93,25 @@ def get_document_details(refcode):
 
     return title, clean_content
 
-# 5. Публикация новости в WordPress
+# 5. Получаем список заголовков уже опубликованных постов на WP
+def get_published_titles(username, application_password):
+    wp_url = "https://linale.lt/wp-json/wp/v2/posts?per_page=100"
+    credentials = f"{username}:{application_password}"
+    token = base64.b64encode(credentials.encode())
+    headers = {
+        "Authorization": f"Basic {token.decode('utf-8')}"
+    }
+
+    response = httpx.get(wp_url, headers=headers)
+    if response.status_code == 200:
+        posts = response.json()
+        titles = [post['title']['rendered'] for post in posts]
+        return titles
+    else:
+        print(f"Ошибка при получении списка публикаций: {response.status_code}")
+        return []
+
+# 6. Публикация новости в WordPress
 def publish_post_to_wp(title, content, username, application_password):
     wp_url = "https://linale.lt/wp-json/wp/v2/posts"
     
@@ -118,26 +134,6 @@ def publish_post_to_wp(title, content, username, application_password):
     else:
         print(f"Ошибка публикации '{title}': {response.status_code} - {response.text}")
 
-# Проверка времени запуска: с 8 утра до 8 вечера по CET, каждые два часа
-def is_time_to_run():
-    tz = pytz.timezone('Europe/Berlin')
-    now = datetime.datetime.now(tz)
-    hour = now.hour
-    return 8 <= hour <= 20 and (hour % 2 == 0)
-
-# Загружаем список уже опубликованных refCode из файла
-def load_published():
-    try:
-        with open("published.txt", "r", encoding="utf-8") as f:
-            return set(line.strip() for line in f if line.strip())
-    except FileNotFoundError:
-        return set()
-
-# Сохраняем новый опубликованный refCode в файл
-def save_published(refcode):
-    with open("published.txt", "a", encoding="utf-8") as f:
-        f.write(refcode + "\n")
-
 # Основной запуск
 def main():
     news_data = get_latest_news()
@@ -147,12 +143,18 @@ def main():
 
     refcodes = save_refcodes_to_file(news_data, "refcodes.txt")
 
+    published_titles = get_published_titles("p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
+
     for ref_code in refcodes:
         print(f"Fetching news {ref_code}...")
         try:
             title, content = get_document_details(ref_code)
         except Exception as e:
             print(f"Ошибка при загрузке новости {ref_code}: {e}")
+            continue
+
+        if title in published_titles:
+            print(f"Новость '{title}' уже опубликована, пропускаем.")
             continue
 
         publish_post_to_wp(title, content, "p3anjn", "DeEu QF8K o4tj rULp nFw7 38Te")
