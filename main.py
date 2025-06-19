@@ -3,6 +3,7 @@ import json
 from bs4 import BeautifulSoup, NavigableString, Tag
 import base64
 import os
+import sys
 
 def get_latest_news():
     url = "https://ec.europa.eu/commission/presscorner/api/latestnews?language=en&pagesize=30&pagenumber=1"
